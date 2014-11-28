@@ -136,12 +136,21 @@ namespace CheckReadOnlyDAL
             SyntaxNode syntaxNode = methodSymbol.DeclaringSyntaxReferences[0].GetSyntaxAsync().Result;
 
             //---------------------- get command's index --------------------------
-            var assignmentExpression = syntaxNode.DescendantNodes().OfType<AssignmentExpressionSyntax>()
-                .Where(e => e.CSharpKind() == SyntaxKind.SimpleAssignmentExpression && e.Left.ToString() == "this.Adapter.SelectCommand" )
-                .Single();
-
             Regex rx = new Regex(@"this\.CommandCollection\[(\d+)\]");
-            Match match = rx.Match(assignmentExpression.Right.ToString());
+
+            var expression = syntaxNode.DescendantNodes()
+                .Where(e => (e.CSharpKind() == SyntaxKind.SimpleAssignmentExpression && rx.Match(((AssignmentExpressionSyntax)e).Right.ToString()).Success) || (e.CSharpKind() == SyntaxKind.EqualsValueClause && rx.Match(((EqualsValueClauseSyntax)e).Value.ToString()).Success))
+                .SingleOrDefault();
+
+            if (expression == null)
+                return null;
+            string expStr;
+            if(expression.CSharpKind() == SyntaxKind.SimpleAssignmentExpression)
+                expStr = ((AssignmentExpressionSyntax)expression).Right.ToString();
+            else
+                expStr = ((EqualsValueClauseSyntax)expression).Value.ToString();
+
+            Match match = rx.Match(expStr);
             if (!match.Success)
                 return null;
 
@@ -150,11 +159,11 @@ namespace CheckReadOnlyDAL
             //---------------------- get stored proc's name -------------------------- 
             MethodDeclarationSyntax initCommandCollectionMethod = getInitCommandCollectionMethodFromCalledMethod(syntaxNode);
 
-            assignmentExpression = initCommandCollectionMethod.DescendantNodes().OfType<AssignmentExpressionSyntax>()
+            var assignmentExpression2 = initCommandCollectionMethod.DescendantNodes().OfType<AssignmentExpressionSyntax>()
                 .Where(e => e.CSharpKind() == SyntaxKind.SimpleAssignmentExpression && e.Left.ToString() == targetAssigment)
                 .Single();
 
-            return assignmentExpression.Right.ToString().Trim('\"');
+            return assignmentExpression2.Right.ToString().Trim('\"');
         }
 
         private MethodDeclarationSyntax getInitCommandCollectionMethodFromCalledMethod(SyntaxNode methodSyntaxNode)

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.IO;
 using System.Configuration;
@@ -18,6 +19,37 @@ namespace CheckReadOnlyDAL
         private int _totalParsedChars;
         public int CurrentSourceLineNumber{get; private set;}
 
+        class ContainsReadOnlyCallChecker
+        {
+            private TargetFilesFetcher parent;
+            private ManualResetEvent _doneEvent;
+            public bool Result { get; set; }
+            public string FileName { get; private set; }
+
+            public ContainsReadOnlyCallChecker(TargetFilesFetcher parent, ManualResetEvent doneEvent)
+            { 
+                this.parent = parent;
+                _doneEvent = doneEvent;
+            }
+
+            public void containsReadOnlyCall(object threadContext)
+            {
+                FileName = (string)threadContext;
+                IEnumerable<string> lines = File.ReadLines(FileName);
+
+                foreach (var line in lines)
+                {
+                    if (parent.MatchSrc(line))
+                    {
+                        Result = true;
+                        break;
+                    }
+                }
+
+                Result = false;
+            }
+        }
+
         private Regex Rx
         {
             get
@@ -26,7 +58,6 @@ namespace CheckReadOnlyDAL
                 {
                     string GetReadOnlyInstanceMethod = ConfigurationManager.AppSettings["GetReadOnlyInstanceMethod"];
                     string pattern = string.Format(@"\b\w+\.{0}\(\)\.(\w+)\(.*\)", GetReadOnlyInstanceMethod);
-                    //string pattern = string.Format(@"\b{0}\b", GetReadOnlyInstanceMethod);
                     _rx = new Regex(pattern);
                 }
                 return _rx;
@@ -79,24 +110,27 @@ namespace CheckReadOnlyDAL
         public IEnumerable<string> getFileNames(string curDir)
         {
             string[] files = Directory.GetFiles(curDir, "*.cs", SearchOption.AllDirectories);
+            ManualResetEvent[] doneEvents = new ManualResetEvent[files.Length];
+            ContainsReadOnlyCallChecker[] checkers = new ContainsReadOnlyCallChecker[files.Length];
+
+            for (int i = 0, n = files.Length; i < n; i++ )
+            {
+                doneEvents[i] = new ManualResetEvent(false);
+                ContainsReadOnlyCallChecker checker = new ContainsReadOnlyCallChecker(this, doneEvents[i]);
+
+                checkers[i] = checker;
+
+                ThreadPool.QueueUserWorkItem(checker.containsReadOnlyCall, files[i]);
+            }
+
+            WaitHandle.WaitAll(doneEvents);
 
             List<string> result = new List<string>();
 
-            foreach(string fileName in files)
+            for (int i = 0, n = checkers.Length; i < n; i++ )
             {
-                IEnumerable<string> lines = File.ReadLines(fileName);//.Where(line => MatchSrc(line));
-
-                /*if (lines.Count(line => MatchSrc(line)) > 0)
-                    result.Add(fileName);*/
-
-                foreach(var line in lines)
-                {
-                    if(MatchSrc(line))
-                    {
-                        result.Add(fileName);
-                        break;
-                    }
-                }
+                if(checkers[i].Result)
+                    result.Add(checkers[i].FileName);
             }
 
             return result;
