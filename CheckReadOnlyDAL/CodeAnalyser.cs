@@ -53,8 +53,10 @@ namespace CheckReadOnlyDAL
             _sqlAnalyser = new SqlAnalyser();
         }
 
-        public void Analyze(CheckReadOnlyDALResultMessage message)
+        public void Analyze()
         {
+            CheckReadOnlyDALResultMessage message = new CheckReadOnlyDALResultMessage();
+
             //Initialize response's message
             message.rootPath = Path.GetDirectoryName(_projectFileName);
             message.projectName = Path.GetFileNameWithoutExtension(_projectFileName);
@@ -83,15 +85,17 @@ namespace CheckReadOnlyDAL
                     logError(message, e.Message, _targetSrcFilesListEnumerator.Current, _targetFilesFetcher.CurrentSourceLineNumber, typeOfDALobject, spName);
                 }
             }
+
+            message.print();
         }
 
         private void logError(CheckReadOnlyDALResultMessage message, string errorMessage, string sourceFileName, int sourceLineNumber, string typeOfDALobj, string spName)
         {
-            message.errorMessages.Add(errorMessage);
-            message.sourceFileNames.Add(sourceFileName);
-            message.sourceLineNumbers.Add(sourceLineNumber);
-            message.typeOfDALobjects.Add(typeOfDALobj);
-            message.storedProcedureNames.Add(spName);
+            message.ErrorMessages.Add(errorMessage);
+            message.SourceFileNames.Add(sourceFileName);
+            message.SourceLineNumbers.Add(sourceLineNumber);
+            message.TypeOfDALobjects.Add(typeOfDALobj);
+            message.StoredProcedureNames.Add(spName);
         }
 
         private ISymbol getNextReadOnlyDALCalledMethod()

@@ -18,18 +18,22 @@ namespace CheckReadOnlyDAL
         private List<string>.Enumerator _currentSrcLinesEnumerator;
         private int _totalParsedChars;
         public int CurrentSourceLineNumber{get; private set;}
+        private string _pattern;
+        private int threadCount = 0;
+        private CountdownEvent _countDownEvent;
 
         class ContainsReadOnlyCallChecker
         {
             private TargetFilesFetcher parent;
-            private ManualResetEvent _doneEvent;
             public bool Result { get; set; }
             public string FileName { get; private set; }
+            private Regex localRx;
 
-            public ContainsReadOnlyCallChecker(TargetFilesFetcher parent, ManualResetEvent doneEvent)
+            public ContainsReadOnlyCallChecker(TargetFilesFetcher parent)
             { 
                 this.parent = parent;
-                _doneEvent = doneEvent;
+
+                localRx = new Regex(parent._pattern);
             }
 
             public void containsReadOnlyCall(object threadContext)
@@ -39,14 +43,18 @@ namespace CheckReadOnlyDAL
 
                 foreach (var line in lines)
                 {
-                    if (parent.MatchSrc(line))
+                    if (localRx.IsMatch(line))
                     {
                         Result = true;
-                        break;
+                        parent._countDownEvent.Signal();
+                        Interlocked.Decrement(ref parent.threadCount);
+                        return;
                     }
                 }
 
                 Result = false;
+                parent._countDownEvent.Signal();
+                Interlocked.Decrement(ref parent.threadCount);
             }
         }
 
@@ -56,12 +64,16 @@ namespace CheckReadOnlyDAL
             {
                 if(_rx == null)
                 {
-                    string GetReadOnlyInstanceMethod = ConfigurationManager.AppSettings["GetReadOnlyInstanceMethod"];
-                    string pattern = string.Format(@"\b\w+\.{0}\(\)\.(\w+)\(.*\)", GetReadOnlyInstanceMethod);
-                    _rx = new Regex(pattern);
+                    _rx = new Regex(_pattern);
                 }
                 return _rx;
             }
+        }
+
+        public TargetFilesFetcher()
+        { 
+            string GetReadOnlyInstanceMethod = ConfigurationManager.AppSettings["GetReadOnlyInstanceMethod"];
+            _pattern = string.Format(@"\b\w+\.{0}\(\)\.(\w+)\(.*\)", GetReadOnlyInstanceMethod);
         }
 
         public bool MatchSrc(string srcLine)
@@ -110,20 +122,31 @@ namespace CheckReadOnlyDAL
         public IEnumerable<string> getFileNames(string curDir)
         {
             string[] files = Directory.GetFiles(curDir, "*.cs", SearchOption.AllDirectories);
-            ManualResetEvent[] doneEvents = new ManualResetEvent[files.Length];
-            ContainsReadOnlyCallChecker[] checkers = new ContainsReadOnlyCallChecker[files.Length];
+            int N = files.Length;
 
-            for (int i = 0, n = files.Length; i < n; i++ )
+            Console.WriteLine("{0} source code files in target folder", N);
+
+            ContainsReadOnlyCallChecker[] checkers = new ContainsReadOnlyCallChecker[N];
+
+            _countDownEvent = new CountdownEvent(N);
+
+            for (int i = 0, n = N; i < n; )
             {
-                doneEvents[i] = new ManualResetEvent(false);
-                ContainsReadOnlyCallChecker checker = new ContainsReadOnlyCallChecker(this, doneEvents[i]);
+                if(threadCount < 64)
+                { 
+                    ContainsReadOnlyCallChecker checker = new ContainsReadOnlyCallChecker(this);
 
-                checkers[i] = checker;
+                    checkers[i] = checker;
 
-                ThreadPool.QueueUserWorkItem(checker.containsReadOnlyCall, files[i]);
+                    if (ThreadPool.QueueUserWorkItem(checker.containsReadOnlyCall, files[i]))
+                    {
+                        Interlocked.Increment(ref threadCount);
+                        i++;
+                    }
+                }
             }
 
-            WaitHandle.WaitAll(doneEvents);
+            _countDownEvent.Wait();
 
             List<string> result = new List<string>();
 
@@ -132,6 +155,8 @@ namespace CheckReadOnlyDAL
                 if(checkers[i].Result)
                     result.Add(checkers[i].FileName);
             }
+
+            Console.WriteLine("{0} source code files to analyze", result.Count);
 
             return result;
         }

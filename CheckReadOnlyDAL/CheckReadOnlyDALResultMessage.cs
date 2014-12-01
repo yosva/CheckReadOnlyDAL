@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CheckReadOnlyDAL
@@ -13,11 +14,12 @@ namespace CheckReadOnlyDAL
         private List<int> _sourceLineNumbers;
         private List<string> _typeOfDALobjects;
         private List<string> _storedProcedureNames;
+        //private ManualResetEvent _doneEvent;
 
         public string rootPath;
         public string projectName;
 
-        public List<string> errorMessages
+        public List<string> ErrorMessages
         {
             get
             { 
@@ -27,7 +29,7 @@ namespace CheckReadOnlyDAL
             }
         }
 
-        public List<string> sourceFileNames
+        public List<string> SourceFileNames
         {
             get
             {
@@ -37,7 +39,7 @@ namespace CheckReadOnlyDAL
             }
         }
 
-        public List<int> sourceLineNumbers
+        public List<int> SourceLineNumbers
         {
             get
             {
@@ -47,7 +49,7 @@ namespace CheckReadOnlyDAL
             }
         }
 
-        public List<string> typeOfDALobjects
+        public List<string> TypeOfDALobjects
         {
             get
             {
@@ -57,7 +59,7 @@ namespace CheckReadOnlyDAL
             }
         }
 
-        public List<string> storedProcedureNames
+        public List<string> StoredProcedureNames
         {
             get
             {
@@ -69,11 +71,24 @@ namespace CheckReadOnlyDAL
 
         public void print()
         {
-            for (int i = 0, n = _errorMessages.Count; i < n; i++)
+            for (int i = 0, n = ErrorMessages.Count; i < n; i++)
             {
                 Console.WriteLine("PROJECT: {0}; ERROR: {1}; SRCFILE: {2}; SRCLINE: {3}; DALTYPE: {4}; STOREDPROC: {5}",
-                                    new object[] { projectName, _errorMessages[i], _sourceFileNames[i], _sourceLineNumbers[i], _typeOfDALobjects[i], _storedProcedureNames[i] });
+                                    new object[] { projectName, ErrorMessages[i], SourceFileNames[i], SourceLineNumbers[i], TypeOfDALobjects[i], StoredProcedureNames[i] });
             }
         }
+
+        /*public ManualResetEvent DoneEvent
+        {
+            get
+            {
+                return _doneEvent;
+            }
+        }*/
+
+        /*public CheckReadOnlyDALResultMessage(ManualResetEvent doneEvent)
+        {
+            _doneEvent = doneEvent;
+        }*/
     }
 }
