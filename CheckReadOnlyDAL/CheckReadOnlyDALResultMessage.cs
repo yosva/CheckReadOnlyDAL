@@ -14,7 +14,7 @@ namespace CheckReadOnlyDAL
         private List<int> _sourceLineNumbers;
         private List<string> _typeOfDALobjects;
         private List<string> _storedProcedureNames;
-        private ManualResetEvent _doneEvent;
+        //private ManualResetEvent _doneEvent;
 
         public string rootPath;
         public string projectName;
@@ -78,17 +78,17 @@ namespace CheckReadOnlyDAL
             }
         }
 
-        public ManualResetEvent DoneEvent
+        /*public ManualResetEvent DoneEvent
         {
             get
             {
                 return _doneEvent;
             }
-        }
+        }*/
 
-        public CheckReadOnlyDALResultMessage(ManualResetEvent doneEvent)
+        /*public CheckReadOnlyDALResultMessage(ManualResetEvent doneEvent)
         {
             _doneEvent = doneEvent;
-        }
+        }*/
     }
 }

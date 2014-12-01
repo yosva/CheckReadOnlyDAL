@@ -224,7 +224,7 @@ END ", spSrc);
 
             PrivateObject accessor = new PrivateObject(codeAnaliser);
             
-            CheckReadOnlyDALResultMessage message = new CheckReadOnlyDALResultMessage(null);
+            CheckReadOnlyDALResultMessage message = new CheckReadOnlyDALResultMessage();
 
             accessor.Invoke("logError", new object[]{message, "msg", "file1.cs", 5, "DALType", "spTest"});
 

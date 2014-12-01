@@ -53,9 +53,9 @@ namespace CheckReadOnlyDAL
             _sqlAnalyser = new SqlAnalyser();
         }
 
-        public void Analyze(object threadContext)
+        public void Analyze()
         {
-            CheckReadOnlyDALResultMessage message = (CheckReadOnlyDALResultMessage)threadContext;
+            CheckReadOnlyDALResultMessage message = new CheckReadOnlyDALResultMessage();
 
             //Initialize response's message
             message.rootPath = Path.GetDirectoryName(_projectFileName);
@@ -86,7 +86,7 @@ namespace CheckReadOnlyDAL
                 }
             }
 
-            message.DoneEvent.Set();
+            message.print();
         }
 
         private void logError(CheckReadOnlyDALResultMessage message, string errorMessage, string sourceFileName, int sourceLineNumber, string typeOfDALobj, string spName)

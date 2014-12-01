@@ -38,16 +38,17 @@ namespace CheckReadOnlyDAL
             Console.WriteLine("{0} projects found", projToFilesDict.Count);
 
             //---------------------------------------------------------------------------------------
+            int threadCount = 0;
             int N = projToFilesDict.Count;
-            ManualResetEvent[] doneEvents = new ManualResetEvent[N];
-            CodeAnalyser[] codeAnalisers = new CodeAnalyser[N];
-            CheckReadOnlyDALResultMessage[] messsages = new CheckReadOnlyDALResultMessage[N];
+            CountdownEvent countDownEvent = new CountdownEvent(N);
 
             var myEnum2 = projToFilesDict.Keys.GetEnumerator();
-            int i = 0;
-            while (myEnum2.MoveNext())
-            {
+            if (!myEnum2.MoveNext())
+                return 0;
 
+            for(int i=0; i<N; )
+            {
+                
                 string key = myEnum2.Current;
 
                 Console.WriteLine("Scanning project <{0}> ...", key);
@@ -55,23 +56,22 @@ namespace CheckReadOnlyDAL
                 List<string> srcFnList = projToFilesDict[key];
 
                 CodeAnalyser codeAnaliser = new CodeAnalyser(key, srcFnList);
-                codeAnalisers[i] = codeAnaliser;
-                ManualResetEvent doneEvent = new ManualResetEvent(false);
-                doneEvents[i] = doneEvent;
-                CheckReadOnlyDALResultMessage message = new CheckReadOnlyDALResultMessage(doneEvent);
-                messsages[i] = message;
 
-                ThreadPool.QueueUserWorkItem(codeAnaliser.Analyze, message);
-
-                i++;
+                if (ThreadPool.QueueUserWorkItem((Object threadContext) =>
+                {
+                    CodeAnalyser localCodeAnalyer = (CodeAnalyser)threadContext;
+                    localCodeAnalyer.Analyze();
+                    Interlocked.Decrement(ref threadCount);
+                    countDownEvent.Signal();
+                }, codeAnaliser))
+                {
+                    i++;
+                    myEnum2.MoveNext();
+                    Interlocked.Increment(ref threadCount);
+                }
             }
 
-            WaitHandle.WaitAll(doneEvents);
-
-            for (i = 0; i < N; i++)
-            {
-                messsages[i].print();
-            }
+            countDownEvent.Wait();
             //---------------------------------------------------------------------------------------
 
             return 0;
