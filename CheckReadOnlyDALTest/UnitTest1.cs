@@ -1,5 +1,7 @@
 ﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+//using System.Threading;
+//using Microsoft.VisualStudio.TestTools.Common;
 using CheckReadOnlyDAL;
 using System.Collections;
 using System.Collections.Generic;
@@ -48,6 +50,8 @@ namespace CheckReadOnlyDALTest
         [TestMethod]
         public void getProjToSrcFilesDictTest()
         {
+            //TestRunConfiguration.ApartmentState = ApartmentState.MTA;
+
             Dictionary<string, List<string>> projToFilesDict = targetFilesFetcher.getProjToSrcFilesDict("D:/Main/Service/Services/ServicesR1/Cdiscount.Business.Stock");
             
             Dictionary<string, List<string>> expectedProjToFilesDict = new Dictionary<string,List<string>>();
@@ -220,24 +224,24 @@ END ", spSrc);
 
             PrivateObject accessor = new PrivateObject(codeAnaliser);
             
-            CheckReadOnlyDALResultMessage message = new CheckReadOnlyDALResultMessage();
+            CheckReadOnlyDALResultMessage message = new CheckReadOnlyDALResultMessage(null);
 
             accessor.Invoke("logError", new object[]{message, "msg", "file1.cs", 5, "DALType", "spTest"});
 
-            Assert.AreEqual(1, message.errorMessages.Count);
-            Assert.AreEqual("msg", message.errorMessages[0]);
+            Assert.AreEqual(1, message.ErrorMessages.Count);
+            Assert.AreEqual("msg", message.ErrorMessages[0]);
 
-            Assert.AreEqual(1, message.sourceFileNames.Count);
-            Assert.AreEqual("file1.cs", message.sourceFileNames[0]);
+            Assert.AreEqual(1, message.SourceFileNames.Count);
+            Assert.AreEqual("file1.cs", message.SourceFileNames[0]);
 
-            Assert.AreEqual(1, message.sourceLineNumbers.Count);
-            Assert.AreEqual(5, message.sourceLineNumbers[0]);
+            Assert.AreEqual(1, message.SourceLineNumbers.Count);
+            Assert.AreEqual(5, message.SourceLineNumbers[0]);
 
-            Assert.AreEqual(1, message.typeOfDALobjects.Count);
-            Assert.AreEqual("DALType", message.typeOfDALobjects[0]);
+            Assert.AreEqual(1, message.TypeOfDALobjects.Count);
+            Assert.AreEqual("DALType", message.TypeOfDALobjects[0]);
 
-            Assert.AreEqual(1, message.storedProcedureNames.Count);
-            Assert.AreEqual("spTest", message.storedProcedureNames[0]);
+            Assert.AreEqual(1, message.StoredProcedureNames.Count);
+            Assert.AreEqual("spTest", message.StoredProcedureNames[0]);
         }
     }
 }

@@ -17,6 +17,7 @@ namespace CheckReadOnlyDAL
 {
     class Program
     {
+        [MTAThread]
         static int Main(string[] args)
         {
             if(args.Length == 0)
@@ -32,62 +33,48 @@ namespace CheckReadOnlyDAL
 
             Dictionary<string, List<string>> projToFilesDict = getTargetFiles.getProjToSrcFilesDict(args[0]);
 
+            getTargetFiles = null;
+
             Console.WriteLine("{0} projects found", projToFilesDict.Count);
 
-            var myEnum = projToFilesDict.Keys.GetEnumerator();
+            //---------------------------------------------------------------------------------------
+            int N = projToFilesDict.Count;
+            ManualResetEvent[] doneEvents = new ManualResetEvent[N];
+            CodeAnalyser[] codeAnalisers = new CodeAnalyser[N];
+            CheckReadOnlyDALResultMessage[] messsages = new CheckReadOnlyDALResultMessage[N];
 
-            while (myEnum.MoveNext())
+            var myEnum2 = projToFilesDict.Keys.GetEnumerator();
+            int i = 0;
+            while (myEnum2.MoveNext())
             {
-                string key = myEnum.Current;
+
+                string key = myEnum2.Current;
 
                 Console.WriteLine("Scanning project <{0}> ...", key);
 
                 List<string> srcFnList = projToFilesDict[key];
 
-                var codeAnaliser = new CodeAnalyser(key, srcFnList);
+                CodeAnalyser codeAnaliser = new CodeAnalyser(key, srcFnList);
+                codeAnalisers[i] = codeAnaliser;
+                ManualResetEvent doneEvent = new ManualResetEvent(false);
+                doneEvents[i] = doneEvent;
+                CheckReadOnlyDALResultMessage message = new CheckReadOnlyDALResultMessage(doneEvent);
+                messsages[i] = message;
 
-                CheckReadOnlyDALResultMessage message = new CheckReadOnlyDALResultMessage();
+                ThreadPool.QueueUserWorkItem(codeAnaliser.Analyze, message);
 
-                codeAnaliser.Analyze(message);
-
-                message.print();
+                i++;
             }
+
+            WaitHandle.WaitAll(doneEvents);
+
+            for (i = 0; i < N; i++)
+            {
+                messsages[i].print();
+            }
+            //---------------------------------------------------------------------------------------
 
             return 0;
-
-            #region old code
-            /*try
-            {
-                //string solutionPath = @"D:\Main\Service\Services\Services.sln";
-                var workspace = MSBuildWorkspace.Create();
-
-                //var solution = workspace.OpenSolutionAsync(solutionPath).Result;
-                var project = workspace.OpenProjectAsync(@"D:/Main/Service/Services/ServicesR1/Cdiscount.Business.Stock/Cdiscount.Business.Stock.csproj").Result;
-
-                //var project = solution.Projects.Where(p => p.Name == "Services").First();
-                var compilation = project.GetCompilationAsync().Result;
-                var programClass = compilation.GetTypeByMetadataName("RoslynTest.Program");
-
-                var barMethod = programClass.GetMembers("Bar").First();
-                var fooMethod = programClass.GetMembers("Foo").First();
-
-                //var barResult = SymbolFinder.FindReferencesAsync(barMethod, project).Result.ToList();
-                //var fooResult = SymbolFinder.FindReferencesAsync(fooMethod, solution).Result.ToList();
-
-                //Debug.Assert(barResult.First().Locations.Count() == 1);
-                //Debug.Assert(fooResult.First().Locations.Count() == 0);
-            }
-            catch (ReflectionTypeLoadException e)
-            {
-                Console.WriteLine(e.ToString());
-                var le = e.LoaderExceptions;
-
-                foreach (var item in le)
-                {
-                    Console.WriteLine(item.Message.ToString());
-                }
-            }*/
-            #endregion
         }
     }
 }
