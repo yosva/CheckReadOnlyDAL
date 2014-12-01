@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -21,6 +22,7 @@ namespace CheckReadOnlyDAL
         private string _pattern;
         private int threadCount = 0;
         private CountdownEvent _countDownEvent;
+        private ConcurrentQueue<string> _targetFiles;
 
         class ContainsReadOnlyCallChecker
         {
@@ -126,19 +128,25 @@ namespace CheckReadOnlyDAL
 
             Console.WriteLine("{0} source code files in target folder", N);
 
-            ContainsReadOnlyCallChecker[] checkers = new ContainsReadOnlyCallChecker[N];
+            //ContainsReadOnlyCallChecker[] checkers = new ContainsReadOnlyCallChecker[N];
 
             _countDownEvent = new CountdownEvent(N);
+            _targetFiles = new ConcurrentQueue<string>();
 
             for (int i = 0, n = N; i < n; )
             {
                 if(threadCount < 64)
                 { 
-                    ContainsReadOnlyCallChecker checker = new ContainsReadOnlyCallChecker(this);
+                    //ContainsReadOnlyCallChecker checker = new ContainsReadOnlyCallChecker(this);
 
-                    checkers[i] = checker;
+                    //checkers[i] = checker;
 
-                    if (ThreadPool.QueueUserWorkItem(checker.containsReadOnlyCall, files[i]))
+                    if (ThreadPool.QueueUserWorkItem( (Object threadContext) => {
+                        ContainsReadOnlyCallChecker checker = new ContainsReadOnlyCallChecker(this);
+                        checker.containsReadOnlyCall(threadContext);
+                        if (checker.Result)
+                            _targetFiles.Enqueue((string)threadContext);
+                    }, files[i]))
                     {
                         Interlocked.Increment(ref threadCount);
                         i++;
@@ -148,17 +156,17 @@ namespace CheckReadOnlyDAL
 
             _countDownEvent.Wait();
 
-            List<string> result = new List<string>();
+            /*List<string> result = new List<string>();
 
             for (int i = 0, n = checkers.Length; i < n; i++ )
             {
                 if(checkers[i].Result)
                     result.Add(checkers[i].FileName);
-            }
+            }*/
 
-            Console.WriteLine("{0} source code files to analyze", result.Count);
+            Console.WriteLine("{0} source code files to analyze", _targetFiles.Count);
 
-            return result;
+            return _targetFiles;
         }
 
         public string getProjectForSrcFile(string srcFile)
